@@ -24,7 +24,7 @@ def clean_csv_file(input_file, output_file, sort_column=None):
     
     try:
         # Read the CSV file
-        df = pd.read_csv(input_file)
+        df = pd.read_csv(input_file, encoding='latin1')
         
         print(f"Successfully read {input_file}")
         print(f"Original shape: {df.shape}")
@@ -106,7 +106,7 @@ def clean_csv_file(input_file, output_file, sort_column=None):
             print("Sorted by arrival date")
         
         # Save the cleaned file
-        df.to_csv(output_file, index=False)
+        df.to_csv(output_file, index=False, encoding = 'mac-roman', errors='replace')
         print(f"Cleaned file saved to: {output_file}")
         print(f"Replaced {total_replaced} NULL/empty values")
         
@@ -116,53 +116,66 @@ def clean_csv_file(input_file, output_file, sort_column=None):
         print(f"Error processing {input_file}: {str(e)}")
         return 0, 0, 0
 
+def convert_to_csv(input_file):
+    """
+    Converts Excel or JSON file to CSV and returns the new CSV file path.
+    If input is already CSV, returns the same path.
+    """
+    ext = os.path.splitext(input_file)[1].lower()
+    csv_file = input_file
+    if ext in ['.xls', '.xlsx']:
+        df = pd.read_excel(input_file)
+        csv_file = input_file.rsplit('.', 1)[0] + '.csv'
+        df.to_csv(csv_file, index=False)
+        print(f"Converted Excel to CSV: {csv_file}")
+    elif ext == '.json':
+        df = pd.read_json(input_file)
+        csv_file = input_file.rsplit('.', 1)[0] + '.csv'
+        df.to_csv(csv_file, index=False)
+        print(f"Converted JSON to CSV: {csv_file}")
+    elif ext == '.csv':
+        pass  # Already CSV
+    else:
+        raise ValueError("Unsupported file type. Please provide a CSV, Excel, or JSON file.")
+    return csv_file
+
 def main():
     print("CSV Data Cleaning Tool")
     print("=" * 50)
     
-    # Define files to clean
-    files_to_clean = [
-        {
-            'input': 'demographics_both_hospitals.csv',
-            'output': 'cleaned_demographics_both_hospitals.csv',
-            'sort_column': None,  # Will use default hotel sorting
-            'description': 'Hotel Booking Data'
-        },
-        {
-            'input': 'student/student_scores cop.csv',
-            'output': 'cleaned_student_scores.csv',
-            'sort_column': 'Total_marks',
-            'description': 'Student Scores Data'
-        }
-    ]
-    
     total_files_processed = 0
     total_records_processed = 0
     total_nulls_replaced = 0
-    
-    for file_info in files_to_clean:
-        input_file = file_info['input']
-        output_file = file_info['output']
-        sort_column = file_info['sort_column']
-        description = file_info['description']
-        
-        if os.path.exists(input_file):
-            print(f"\n{'='*60}")
-            print(f"Processing: {description}")
-            print(f"Input file: {input_file}")
-            print(f"Output file: {output_file}")
-            
-            records, replaced, remaining = clean_csv_file(input_file, output_file, sort_column)
-            if records > 0:
-                total_files_processed += 1
-                total_records_processed += records
-                total_nulls_replaced += replaced
-                print(f"✓ Successfully processed {description}")
-            else:
-                print(f"✗ Failed to process {description}")
-        else:
-            print(f"\n⚠ Warning: {input_file} not found, skipping...")
-    
+
+    input_file = input("Enter the path to the input file (CSV, Excel, or JSON): ").strip()
+    if not os.path.exists(input_file):
+        print(f"File {input_file} does not exist. Please check the path and try again.")
+        return
+
+    try:
+        csv_input_file = convert_to_csv(input_file)
+    except Exception as e:
+        print(f"Error: {e}")
+        return
+
+    base_name = os.path.basename(csv_input_file)
+    description = f"Cleaning '{base_name}'"
+    output_file = f"cleaned_{base_name}"
+
+    print(f"\n{'='*60}")
+    print(f"Processing: {description}")
+    print(f"Input file: {csv_input_file}")
+    print(f"Output file: {output_file}")
+
+    records, replaced, remaining = clean_csv_file(csv_input_file, output_file, sort_column=None)
+    if records > 0:
+        total_files_processed += 1
+        total_records_processed += records
+        total_nulls_replaced += replaced
+        print(f"✓ Successfully processed {description}")
+    else:
+        print(f"✗ Failed to process {description}")
+
     # Summary
     print(f"\n{'='*60}")
     print("CLEANING SUMMARY")
